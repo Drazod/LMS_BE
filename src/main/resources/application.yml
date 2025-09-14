@@ -1,0 +1,20 @@
+#spring:
+#  boot:
+#    admin:
+#      client:
+#        url: http://localhost:8761/
+#
+#logging:
+#  file:
+#    name: curcus-log.log
+#    max-history: 20
+#    max-size: 20MB
+#
+#management:
+#  endpoints:
+#    web:
+#      exposure:
+#        include: "*"
+#  endpoint:
+#    health:
+#      show-details: always
