@@ -23,6 +23,7 @@ import java.util.stream.Collectors;
 @Mapper(componentModel = "spring")
 public abstract class SectionMapper {
 	@Mapping(source = "course.courseId", target = "courseId")
+    @Mapping(source = "sectionId", target = "sectionId")
     public abstract SectionCreateResponse toResponse(Section section);
 
     @Mapping(source = "section.sectionId", target = "sectionId")

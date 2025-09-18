@@ -6,6 +6,7 @@ import lombok.Data;
 
 @Data
 public class SectionCreateResponse implements Serializable {
+    private Long sectionId; // New field for section id
     private Long courseId;
     private String sectionName;
     private Long position;

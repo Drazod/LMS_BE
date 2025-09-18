@@ -17,6 +17,10 @@ public class FileValidation {
         ALLOWED_IMAGE_TYPES.add("png");
         ALLOWED_IMAGE_TYPES.add("jpg");
         ALLOWED_VIDEO_TYPES.add("mp4");
+        ALLOWED_VIDEO_TYPES.add("avi");
+        ALLOWED_VIDEO_TYPES.add("mov");
+        ALLOWED_VIDEO_TYPES.add("mkv");
+        ALLOWED_VIDEO_TYPES.add("webm");
     }
 
     public static boolean isValidFileType(String fileName) {
