@@ -211,16 +211,20 @@ public class CourseServiceImpl implements CourseService {
 
     @Override
     public SectionCreateResponse createSection(SectionRequest sectionRequest) {
-        Section section = new Section();
-        Course course = courseRepository.findById(sectionRequest.getCourseId())
-                .orElseThrow(() -> new NotFoundException(
-                        "Course has not existed with id " + sectionRequest.getCourseId()));
+    Section section = new Section();
+    Course course = courseRepository.findById(sectionRequest.getCourseId())
+        .orElseThrow(() -> new NotFoundException(
+            "Course has not existed with id " + sectionRequest.getCourseId()));
 
-        section.setCourse(course);
-        section.setSectionName(sectionRequest.getSectionName());
-        section.setPosition(sectionRequest.getPosition());
-        SectionCreateResponse sectionCreateResponse = sectionMapper.toResponse(sectionRepository.save(section));
-        return sectionCreateResponse;
+    section.setCourse(course);
+    section.setSectionName(sectionRequest.getSectionName());
+    // Auto-increment position: find max position for this course
+    Long maxPosition = sectionRepository.findTopByCourse_CourseIdOrderByPositionDesc(course.getCourseId())
+        .map(Section::getPosition)
+        .orElse(0L);
+    section.setPosition(maxPosition + 1);
+    SectionCreateResponse sectionCreateResponse = sectionMapper.toResponse(sectionRepository.save(section));
+    return sectionCreateResponse;
     }
 
     @Override

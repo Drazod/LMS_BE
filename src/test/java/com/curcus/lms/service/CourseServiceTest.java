@@ -180,10 +180,9 @@ class CourseServiceTest {
     @Test
     void testCreateSection() {
         // Prepare test data
-        SectionRequest sectionRequest = new SectionRequest();
-        sectionRequest.setCourseId(1L);
-        sectionRequest.setSectionName("Introduction");
-        sectionRequest.setPosition(1L);
+    SectionRequest sectionRequest = new SectionRequest();
+    sectionRequest.setCourseId(1L);
+    sectionRequest.setSectionName("Introduction");
 
         Course course = new Course();
         course.setCourseId(1L);
@@ -191,12 +190,12 @@ class CourseServiceTest {
         Section section = new Section();
         section.setCourse(course);
         section.setSectionName("Introduction");
-        section.setPosition(1L);
+    // section.setPosition(1L); // Position is now set by backend
 
         SectionCreateResponse sectionCreateResponse = new SectionCreateResponse();
         sectionCreateResponse.setCourseId(1L);
         sectionCreateResponse.setSectionName("Introduction");
-        sectionCreateResponse.setPosition(1L);
+    // sectionCreateResponse.setPosition(1L); // Position is now set by backend
 
         when(courseRepository.findById(sectionRequest.getCourseId())).thenReturn(Optional.of(course));
         when(sectionRepository.save(any(Section.class))).thenReturn(section);

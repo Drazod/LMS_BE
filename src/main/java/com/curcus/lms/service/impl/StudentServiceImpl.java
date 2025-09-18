@@ -428,12 +428,18 @@ public class StudentServiceImpl implements StudentService {
             throw new ValidationException("This section is not the current section");
         }
 
-        // check if current section is the last section
+        // DEBUG LOGS
+        System.out.println("[DEBUG] currentSectionInDB.getPosition(): " + currentSectionInDB.getPosition());
         Section lastSection = sectionRepository
                 .findTopByCourse_CourseIdOrderByPositionDesc(enrollment.getCourse().getCourseId())
                 .orElseThrow(() -> new NotFoundException("Last section doesn't exist"));
+        System.out.println("[DEBUG] lastSection.getPosition(): " + lastSection.getPosition());
+        System.out.println("[DEBUG] enrollment.getCurrentSectionPosition(): " + enrollment.getCurrentSectionPosition());
+        System.out.println("[DEBUG] enrollment.getIsComplete() before: " + enrollment.getIsComplete());
+
         if (currentSectionInDB.getPosition() == lastSection.getPosition()) {
             // complete last section -> complete course. current section -> null
+            System.out.println("[DEBUG] Completing last section. Marking course as complete.");
             enrollment.setCurrentSectionPosition(null);
             enrollment.setIsComplete(true);
             enrollment.setCompletionDate(new Date());
@@ -442,6 +448,7 @@ public class StudentServiceImpl implements StudentService {
             enrollment.setCurrentSectionPosition(enrollment.getCurrentSectionPosition() + 1);
         }
         enrollmentRepository.save(enrollment);
+        System.out.println("[DEBUG] enrollment.getIsComplete() after: " + enrollment.getIsComplete());
 
         // return new current section
         return getCurrentSection(request.getStudentId(), course.getCourseId());
@@ -452,22 +459,45 @@ public class StudentServiceImpl implements StudentService {
         SectionCompleteResponse response = new SectionCompleteResponse();
 
         Enrollment enrollment = enrollmentRepository.findByStudent_UserIdAndCourse_CourseId(studentId, courseId);
-        if (enrollment == null)
-            throw new NotFoundException("Student has not enrolled the course");
+        if (enrollment == null) {
+            response.setSectionId(null);
+            response.setPosition(null);
+            response.setCourseCompleted(false);
+            response.setMessage("Student has not enrolled in this course.");
+            return response;
+        }
         if (enrollment.getIsComplete()) {
             response.setSectionId(null);
             response.setPosition(null);
             response.setCourseCompleted(true);
+            response.setMessage("Course is completed. No current section.");
+            return response;
+        }
+
+        if (enrollment.getCurrentSectionPosition() == null) {
+            response.setSectionId(null);
+            response.setPosition(null);
+            response.setCourseCompleted(false);
+            response.setMessage("No section started yet. Please begin the course.");
             return response;
         }
 
         Section currentSection = sectionRepository
                 .findByCourse_CourseIdAndPosition(courseId, enrollment.getCurrentSectionPosition())
-                .orElseThrow(() -> new NotFoundException("Section doesn't exist"));
+                .orElse(null);
+
+        if (currentSection == null) {
+            response.setSectionId(null);
+            response.setPosition(null);
+            response.setCourseCompleted(false);
+            response.setMessage("Current section not found. Please contact support.");
+            return response;
+        }
 
         response.setSectionId(currentSection.getSectionId());
         response.setPosition(currentSection.getPosition());
         response.setCourseCompleted(false);
+        response.setMessage("Current section in progress.");
         return response;
     }
 }

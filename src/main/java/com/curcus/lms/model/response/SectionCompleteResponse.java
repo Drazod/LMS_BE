@@ -7,4 +7,5 @@ public class SectionCompleteResponse {
     private Long sectionId;
     private Long position;
     private Boolean courseCompleted;
+    private String message; // User-friendly message
 }

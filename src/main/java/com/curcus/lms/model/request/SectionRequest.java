@@ -11,6 +11,4 @@ public class SectionRequest {
     private Long CourseId;
     @NotNull(message = "Section name cannot be null")
     private String sectionName;
-    @NotNull(message = "Section position cannot be null")
-    private Long position;
 }
