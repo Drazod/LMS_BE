@@ -11,6 +11,7 @@ public class SectionDetailResponse2 {
     private Long sectionId;
     private String sectionName;
     private Long position;
+    private String description;
     private List<ContentDetailResponse> contents;
 }
 
