@@ -2,16 +2,7 @@ package com.curcus.lms.controller;
 
 import com.curcus.lms.model.request.*;
 import com.curcus.lms.model.response.*;
-import com.curcus.lms.model.response.ApiResponse;
-import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.Parameter;
-import io.swagger.v3.oas.annotations.media.Content;
-import io.swagger.v3.oas.annotations.media.ExampleObject;
-import io.swagger.v3.oas.annotations.media.Schema;
-import io.swagger.v3.oas.annotations.responses.ApiResponse as SwaggerApiResponse;
-import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
-import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.constraints.Null;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
@@ -65,7 +56,6 @@ import com.curcus.lms.model.dto.*;
 @Validated
 @CrossOrigin(origins = "*")
 @SecurityRequirement(name = "bearerAuth")
-@Tag(name = "Course Management", description = "APIs for managing courses, sections, and sessions")
 public class CourseController {
     @Autowired
     private CourseService courseService;
@@ -166,152 +156,20 @@ public class CourseController {
         return new ResponseEntity<>(apiResponse, HttpStatus.OK);
     }
 
-    @Operation(
-        summary = "Create Session with Text Content",
-        description = "Creates a new learning session with text-based content only. Use this endpoint for sessions that contain only text content without file uploads."
-    )
-    @ApiResponses(value = {
-        @SwaggerApiResponse(
-            responseCode = "201",
-            description = "Session created successfully",
-            content = @Content(
-                mediaType = "application/json",
-                schema = @Schema(implementation = SessionCreateResponse.class),
-                examples = @ExampleObject(
-                    name = "Successful session creation",
-                    value = """
-                    {
-                      "status": "SUCCESS",
-                      "payload": {
-                        "sectionId": 123,
-                        "sectionName": "Listening Comprehension 1",
-                        "title": "Introduction to English Listening",
-                        "description": "Basic listening exercises to improve comprehension skills",
-                        "sessionType": "LISTEN",
-                        "position": 1,
-                        "contents": [
-                          {
-                            "contentId": 456,
-                            "contentType": "TEXT",
-                            "content": "Listen to the following audio and answer the questions below.",
-                            "position": 1
-                          }
-                        ]
-                      },
-                      "error": null,
-                      "metadata": null
-                    }
-                    """
-                )
-            )
-        ),
-        @SwaggerApiResponse(responseCode = "400", description = "Invalid request data"),
-        @SwaggerApiResponse(responseCode = "401", description = "Unauthorized"),
-        @SwaggerApiResponse(responseCode = "403", description = "Forbidden - not course instructor or admin"),
-        @SwaggerApiResponse(responseCode = "404", description = "Course not found")
-    })
     @PreAuthorize("hasRole('ROLE_ADMIN') or (hasRole('ROLE_INSTRUCTOR') " +
             "and @courseRepository.existsByInstructor_UserIdAndCourseId(authentication.principal.getId(), #sessionCreateRequest.courseId))")
     @PostMapping(value = "/createSession")
     public ResponseEntity<ApiResponse<SessionCreateResponse>> createSession(
-            @Parameter(description = "Session creation request with text content only")
             @RequestBody @Valid SessionCreateRequest sessionCreateRequest) {
         ApiResponse<SessionCreateResponse> apiResponse = new ApiResponse<>();
         apiResponse.ok(courseService.createSession(sessionCreateRequest));
         return new ResponseEntity<>(apiResponse, HttpStatus.CREATED);
     }
 
-    @Operation(
-        summary = "Create Session with Mixed Content Including Files",
-        description = """
-        Creates a new learning session with mixed content including file uploads (images and videos).
-        This endpoint accepts multipart form data and can handle:
-        - Text content (via JSON string)
-        - Image file uploads
-        - Video file uploads
-        - Custom positioning of content items
-        
-        Perfect for listening sessions that need audio/video files and accompanying text.
-        """
-    )
-    @ApiResponses(value = {
-        @SwaggerApiResponse(
-            responseCode = "201",
-            description = "Session with files created successfully",
-            content = @Content(
-                mediaType = "application/json",
-                schema = @Schema(implementation = SessionCreateResponse.class),
-                examples = @ExampleObject(
-                    name = "Successful session with files creation",
-                    value = """
-                    {
-                      "status": "SUCCESS",
-                      "payload": {
-                        "sectionId": 124,
-                        "sectionName": "Listening Comprehension 2",
-                        "title": "Advanced Listening with Multimedia",
-                        "description": "Listening exercises with video and image support",
-                        "sessionType": "LISTEN",
-                        "position": 2,
-                        "contents": [
-                          {
-                            "contentId": 457,
-                            "contentType": "TEXT",
-                            "content": "Watch the video and answer the questions.",
-                            "position": 1
-                          },
-                          {
-                            "contentId": 458,
-                            "contentType": "VIDEO",
-                            "content": "File uploaded - URL will be available shortly",
-                            "position": 2
-                          },
-                          {
-                            "contentId": 459,
-                            "contentType": "IMAGE",
-                            "content": "File uploaded - URL will be available shortly",
-                            "position": 3
-                          }
-                        ]
-                      },
-                      "error": null,
-                      "metadata": null
-                    }
-                    """
-                )
-            )
-        ),
-        @SwaggerApiResponse(responseCode = "400", description = "Invalid request data or file validation failed"),
-        @SwaggerApiResponse(responseCode = "401", description = "Unauthorized"),
-        @SwaggerApiResponse(responseCode = "403", description = "Forbidden - not course instructor or admin"),
-        @SwaggerApiResponse(responseCode = "404", description = "Course not found"),
-        @SwaggerApiResponse(responseCode = "413", description = "File too large"),
-        @SwaggerApiResponse(responseCode = "415", description = "Unsupported file type")
-    })
     @PreAuthorize("hasRole('ROLE_ADMIN') or (hasRole('ROLE_INSTRUCTOR') " +
             "and @courseRepository.existsByInstructor_UserIdAndCourseId(authentication.principal.getId(), #sessionCreateRequest.courseId))")
     @PostMapping(value = "/createSessionWithFiles", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<ApiResponse<SessionCreateResponse>> createSessionWithFiles(
-            @Parameter(description = """
-                Session creation request with file upload support.
-                
-                Form fields:
-                - courseId: ID of the course (required)
-                - sectionName: Name of the session (required)
-                - title: Session title (required)
-                - description: Session description (optional)
-                - sessionType: LISTEN, READING, or SPEAKING (required)
-                - textContents: JSON string array of text content objects (optional)
-                - imageFiles: Array of image files to upload (optional)
-                - videoFiles: Array of video files to upload (optional)
-                - filePositions: JSON string array specifying file positions (optional)
-                
-                Example textContents:
-                [{"contentType":"TEXT","content":"Listen to the audio"},{"contentType":"TEXT","content":"Answer the questions"}]
-                
-                Example filePositions:
-                [2, 4, 3] (places first image at position 2, second image at position 4, first video at position 3)
-                """)
             @ModelAttribute @Valid SessionCreateWithFilesRequest sessionCreateRequest) {
         ApiResponse<SessionCreateResponse> apiResponse = new ApiResponse<>();
         apiResponse.ok(courseService.createSessionWithFiles(sessionCreateRequest));
