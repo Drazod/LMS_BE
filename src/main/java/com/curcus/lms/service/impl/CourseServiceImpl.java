@@ -6,6 +6,7 @@ import com.curcus.lms.model.dto.ContentDeleteWrapper;
 import com.curcus.lms.model.dto.SessionContentItem;
 import com.curcus.lms.model.entity.*;
 import com.curcus.lms.repository.*;
+import com.curcus.lms.constants.ContentType;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.curcus.lms.service.CategorySevice;
