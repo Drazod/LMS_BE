@@ -34,14 +34,14 @@ public class Section {
     @Column(nullable = false)
     private String sectionName;
     
-    @Column(nullable = false)
+    @Column(nullable = true)  // Made optional for backward compatibility
     private String title;
     
     @Column(columnDefinition = "TEXT")
     private String description;
     
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
+    @Column(nullable = true)  // Made optional for backward compatibility
     private SessionType sessionType;
     
     @OneToMany(fetch = FetchType.EAGER, cascade = CascadeType.ALL, mappedBy = "section")
