@@ -2,12 +2,13 @@ package com.curcus.lms.controller;
 
 import com.curcus.lms.model.request.*;
 import com.curcus.lms.model.response.*;
+import com.curcus.lms.model.response.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.ExampleObject;
 import io.swagger.v3.oas.annotations.media.Schema;
-import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponse as SwaggerApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -170,7 +171,7 @@ public class CourseController {
         description = "Creates a new learning session with text-based content only. Use this endpoint for sessions that contain only text content without file uploads."
     )
     @ApiResponses(value = {
-        @ApiResponse(
+        @SwaggerApiResponse(
             responseCode = "201",
             description = "Session created successfully",
             content = @Content(
@@ -204,10 +205,10 @@ public class CourseController {
                 )
             )
         ),
-        @ApiResponse(responseCode = "400", description = "Invalid request data"),
-        @ApiResponse(responseCode = "401", description = "Unauthorized"),
-        @ApiResponse(responseCode = "403", description = "Forbidden - not course instructor or admin"),
-        @ApiResponse(responseCode = "404", description = "Course not found")
+        @SwaggerApiResponse(responseCode = "400", description = "Invalid request data"),
+        @SwaggerApiResponse(responseCode = "401", description = "Unauthorized"),
+        @SwaggerApiResponse(responseCode = "403", description = "Forbidden - not course instructor or admin"),
+        @SwaggerApiResponse(responseCode = "404", description = "Course not found")
     })
     @PreAuthorize("hasRole('ROLE_ADMIN') or (hasRole('ROLE_INSTRUCTOR') " +
             "and @courseRepository.existsByInstructor_UserIdAndCourseId(authentication.principal.getId(), #sessionCreateRequest.courseId))")
@@ -234,7 +235,7 @@ public class CourseController {
         """
     )
     @ApiResponses(value = {
-        @ApiResponse(
+        @SwaggerApiResponse(
             responseCode = "201",
             description = "Session with files created successfully",
             content = @Content(
@@ -280,12 +281,12 @@ public class CourseController {
                 )
             )
         ),
-        @ApiResponse(responseCode = "400", description = "Invalid request data or file validation failed"),
-        @ApiResponse(responseCode = "401", description = "Unauthorized"),
-        @ApiResponse(responseCode = "403", description = "Forbidden - not course instructor or admin"),
-        @ApiResponse(responseCode = "404", description = "Course not found"),
-        @ApiResponse(responseCode = "413", description = "File too large"),
-        @ApiResponse(responseCode = "415", description = "Unsupported file type")
+        @SwaggerApiResponse(responseCode = "400", description = "Invalid request data or file validation failed"),
+        @SwaggerApiResponse(responseCode = "401", description = "Unauthorized"),
+        @SwaggerApiResponse(responseCode = "403", description = "Forbidden - not course instructor or admin"),
+        @SwaggerApiResponse(responseCode = "404", description = "Course not found"),
+        @SwaggerApiResponse(responseCode = "413", description = "File too large"),
+        @SwaggerApiResponse(responseCode = "415", description = "Unsupported file type")
     })
     @PreAuthorize("hasRole('ROLE_ADMIN') or (hasRole('ROLE_INSTRUCTOR') " +
             "and @courseRepository.existsByInstructor_UserIdAndCourseId(authentication.principal.getId(), #sessionCreateRequest.courseId))")
