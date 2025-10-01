@@ -10,6 +10,7 @@ import java.util.List;
 public class SectionDetailResponse2 {
     private Long sectionId;
     private String sectionName;
+    private String title;
     private Long position;
     private String description;
     private List<ContentDetailResponse> contents;
