@@ -4,6 +4,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
+import com.curcus.lms.constants.SessionType;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -32,6 +33,17 @@ public class Section {
     private Course course;
     @Column(nullable = false)
     private String sectionName;
+    
+    @Column(nullable = false)
+    private String title;
+    
+    @Column(columnDefinition = "TEXT")
+    private String description;
+    
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private SessionType sessionType;
+    
     @OneToMany(fetch = FetchType.EAGER, cascade = CascadeType.ALL, mappedBy = "section")
     private List<Content> contents;
 }

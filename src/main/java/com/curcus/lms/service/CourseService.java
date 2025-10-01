@@ -31,6 +31,10 @@ public interface CourseService {
         ContentCreateResponse updateDocumentContent(ContentDocumentUpdateRequest contentDocumentUpdateRequest);
 
         SectionCreateResponse createSection(SectionRequest sectionRequest);
+        
+        SessionCreateResponse createSession(SessionCreateRequest sessionCreateRequest);
+        
+        SessionCreateResponse createSessionWithFiles(SessionCreateWithFilesRequest sessionCreateRequest);
 
         Page<CourseSearchResponse> findByCategory(Long categoryId, Pageable pageable);
 

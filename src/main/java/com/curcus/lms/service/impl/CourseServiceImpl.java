@@ -3,8 +3,11 @@ package com.curcus.lms.service.impl;
 import com.curcus.lms.model.request.*;
 import com.curcus.lms.model.response.*;
 import com.curcus.lms.model.dto.ContentDeleteWrapper;
+import com.curcus.lms.model.dto.SessionContentItem;
 import com.curcus.lms.model.entity.*;
 import com.curcus.lms.repository.*;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.curcus.lms.service.CategorySevice;
 
 import java.io.IOException;
@@ -225,6 +228,219 @@ public class CourseServiceImpl implements CourseService {
     section.setPosition(maxPosition + 1);
     SectionCreateResponse sectionCreateResponse = sectionMapper.toResponse(sectionRepository.save(section));
     return sectionCreateResponse;
+    }
+
+    @Override
+    @Transactional
+    public SessionCreateResponse createSession(SessionCreateRequest sessionCreateRequest) {
+        // Find the course
+        Course course = courseRepository.findById(sessionCreateRequest.getCourseId())
+            .orElseThrow(() -> new NotFoundException(
+                "Course has not existed with id " + sessionCreateRequest.getCourseId()));
+
+        // Create the section (session)
+        Section section = new Section();
+        section.setCourse(course);
+        section.setSectionName(sessionCreateRequest.getSectionName());
+        section.setTitle(sessionCreateRequest.getTitle());
+        section.setDescription(sessionCreateRequest.getDescription());
+        section.setSessionType(sessionCreateRequest.getSessionType());
+        
+        // Auto-increment position: find max position for this course
+        Long maxPosition = sectionRepository.findTopByCourse_CourseIdOrderByPositionDesc(course.getCourseId())
+            .map(Section::getPosition)
+            .orElse(0L);
+        section.setPosition(maxPosition + 1);
+        
+        // Save the section first to get the ID
+        Section savedSection = sectionRepository.save(section);
+        
+        // Create contents if provided
+        List<SessionCreateResponse.ContentResponse> contentResponses = new ArrayList<>();
+        if (sessionCreateRequest.getContents() != null && !sessionCreateRequest.getContents().isEmpty()) {
+            for (int i = 0; i < sessionCreateRequest.getContents().size(); i++) {
+                SessionCreateRequest.SessionContentRequest contentRequest = sessionCreateRequest.getContents().get(i);
+                
+                Content content = new Content();
+                content.setSection(savedSection);
+                content.setType(contentRequest.getContentType());
+                content.setContent(contentRequest.getContent());
+                content.setPosition((long) (i + 1));
+                
+                Content savedContent = contentRepository.save(content);
+                
+                SessionCreateResponse.ContentResponse contentResponse = SessionCreateResponse.ContentResponse.builder()
+                    .contentId(savedContent.getId())
+                    .contentType(savedContent.getType().name())
+                    .content(savedContent.getContent())
+                    .position(savedContent.getPosition())
+                    .build();
+                    
+                contentResponses.add(contentResponse);
+            }
+        }
+        
+        // Build and return response
+        return SessionCreateResponse.builder()
+            .sectionId(savedSection.getSectionId())
+            .sectionName(savedSection.getSectionName())
+            .title(savedSection.getTitle())
+            .description(savedSection.getDescription())
+            .sessionType(savedSection.getSessionType())
+            .position(savedSection.getPosition())
+            .contents(contentResponses)
+            .build();
+    }
+
+    @Override
+    @Transactional
+    public SessionCreateResponse createSessionWithFiles(SessionCreateWithFilesRequest sessionCreateRequest) {
+        // Find the course
+        Course course = courseRepository.findById(sessionCreateRequest.getCourseId())
+            .orElseThrow(() -> new NotFoundException(
+                "Course has not existed with id " + sessionCreateRequest.getCourseId()));
+
+        // Create the section (session)
+        Section section = new Section();
+        section.setCourse(course);
+        section.setSectionName(sessionCreateRequest.getSectionName());
+        section.setTitle(sessionCreateRequest.getTitle());
+        section.setDescription(sessionCreateRequest.getDescription());
+        section.setSessionType(sessionCreateRequest.getSessionType());
+        
+        // Auto-increment position: find max position for this course
+        Long maxPosition = sectionRepository.findTopByCourse_CourseIdOrderByPositionDesc(course.getCourseId())
+            .map(Section::getPosition)
+            .orElse(0L);
+        section.setPosition(maxPosition + 1);
+        
+        // Save the section first to get the ID
+        Section savedSection = sectionRepository.save(section);
+        
+        // Parse content items and organize them
+        List<SessionContentItem> allContentItems = parseSessionContent(sessionCreateRequest);
+        
+        // Sort content items by position
+        allContentItems.sort((a, b) -> Long.compare(a.getPosition(), b.getPosition()));
+        
+        // Create contents
+        List<SessionCreateResponse.ContentResponse> contentResponses = new ArrayList<>();
+        for (SessionContentItem contentItem : allContentItems) {
+            Content content = new Content();
+            content.setSection(savedSection);
+            content.setType(contentItem.getContentType());
+            content.setPosition(contentItem.getPosition());
+            
+            if (contentItem.isFileContent()) {
+                // Handle file upload
+                content.setContent(""); // Will be updated by async upload
+                Content savedContent = contentRepository.save(content);
+                
+                try {
+                    byte[] fileBytes = contentItem.getFile().getBytes();
+                    if (contentItem.getContentType() == ContentType.VIDEO) {
+                        FileValidation.validateVideoType(contentItem.getFile().getOriginalFilename());
+                    }
+                    // Upload file asynchronously
+                    fileAsyncUtil.uploadFileAsync(savedContent.getId(), fileBytes);
+                } catch (Exception e) {
+                    throw new RuntimeException("Failed to process uploaded file", e);
+                }
+                
+                SessionCreateResponse.ContentResponse contentResponse = SessionCreateResponse.ContentResponse.builder()
+                    .contentId(savedContent.getId())
+                    .contentType(savedContent.getType().name())
+                    .content("File uploaded - URL will be available shortly")
+                    .position(savedContent.getPosition())
+                    .build();
+                    
+                contentResponses.add(contentResponse);
+                
+            } else if (contentItem.isTextContent()) {
+                // Handle text content
+                content.setContent(contentItem.getTextContent());
+                Content savedContent = contentRepository.save(content);
+                
+                SessionCreateResponse.ContentResponse contentResponse = SessionCreateResponse.ContentResponse.builder()
+                    .contentId(savedContent.getId())
+                    .contentType(savedContent.getType().name())
+                    .content(savedContent.getContent())
+                    .position(savedContent.getPosition())
+                    .build();
+                    
+                contentResponses.add(contentResponse);
+            }
+        }
+        
+        // Build and return response
+        return SessionCreateResponse.builder()
+            .sectionId(savedSection.getSectionId())
+            .sectionName(savedSection.getSectionName())
+            .title(savedSection.getTitle())
+            .description(savedSection.getDescription())
+            .sessionType(savedSection.getSessionType())
+            .position(savedSection.getPosition())
+            .contents(contentResponses)
+            .build();
+    }
+
+    private List<SessionContentItem> parseSessionContent(SessionCreateWithFilesRequest request) {
+        List<SessionContentItem> contentItems = new ArrayList<>();
+        ObjectMapper objectMapper = new ObjectMapper();
+        
+        try {
+            // Parse text contents
+            if (request.getTextContents() != null && !request.getTextContents().trim().isEmpty()) {
+                List<SessionCreateRequest.SessionContentRequest> textContents = 
+                    objectMapper.readValue(request.getTextContents(), new TypeReference<List<SessionCreateRequest.SessionContentRequest>>() {});
+                
+                for (int i = 0; i < textContents.size(); i++) {
+                    SessionCreateRequest.SessionContentRequest textContent = textContents.get(i);
+                    contentItems.add(SessionContentItem.builder()
+                        .contentType(textContent.getContentType())
+                        .textContent(textContent.getContent())
+                        .position((long) (i + 1))
+                        .build());
+                }
+            }
+            
+            // Parse file positions to know where to place files
+            List<Long> filePositions = new ArrayList<>();
+            if (request.getFilePositions() != null && !request.getFilePositions().trim().isEmpty()) {
+                filePositions = objectMapper.readValue(request.getFilePositions(), new TypeReference<List<Long>>() {});
+            }
+            
+            // Add image files
+            if (request.getImageFiles() != null) {
+                for (int i = 0; i < request.getImageFiles().size(); i++) {
+                    Long position = i < filePositions.size() ? filePositions.get(i) : (long) (contentItems.size() + i + 1);
+                    contentItems.add(SessionContentItem.builder()
+                        .contentType(ContentType.IMAGE)
+                        .file(request.getImageFiles().get(i))
+                        .position(position)
+                        .build());
+                }
+            }
+            
+            // Add video files
+            if (request.getVideoFiles() != null) {
+                int imageFileCount = request.getImageFiles() != null ? request.getImageFiles().size() : 0;
+                for (int i = 0; i < request.getVideoFiles().size(); i++) {
+                    Long position = (imageFileCount + i) < filePositions.size() ? 
+                        filePositions.get(imageFileCount + i) : (long) (contentItems.size() + i + 1);
+                    contentItems.add(SessionContentItem.builder()
+                        .contentType(ContentType.VIDEO)
+                        .file(request.getVideoFiles().get(i))
+                        .position(position)
+                        .build());
+                }
+            }
+            
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to parse session content", e);
+        }
+        
+        return contentItems;
     }
 
     @Override
