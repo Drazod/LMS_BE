@@ -41,10 +41,12 @@ public class SpeechToTextController {
     private static final List<String> ALLOWED_MEDIA_TYPES = Arrays.asList(
             // Audio formats
             "audio/mpeg", "audio/mp3", "audio/wav", "audio/wave", "audio/x-wav", 
-            "audio/m4a", "audio/aac", "audio/ogg", "audio/flac",
-            // Video formats
+            "audio/m4a", "audio/aac", "audio/ogg", "audio/flac", "audio/mp4",
+            // Video formats - including common variations
             "video/mp4", "video/mpeg", "video/quicktime", "video/x-msvideo", 
-            "video/x-ms-wmv", "video/webm", "video/x-flv", "video/x-matroska"
+            "video/x-ms-wmv", "video/webm", "video/x-flv", "video/x-matroska",
+            // Additional MP4 variations
+            "video/mp4v-es", "application/mp4", "application/octet-stream"
     );
 
     private static final long MAX_FILE_SIZE = 100 * 1024 * 1024; // 100MB (increased for video files)
@@ -108,12 +110,11 @@ public class SpeechToTextController {
             String contentType = file.getContentType();
             String fileName = file.getOriginalFilename();
             
-            // Enhanced file type validation - check both MIME type and file extension
+            // Enhanced file type validation - prioritize file extension over MIME type
             boolean isValidFile = false;
-            if (contentType != null && ALLOWED_MEDIA_TYPES.contains(contentType.toLowerCase())) {
-                isValidFile = true;
-            } else if (fileName != null) {
-                // Fallback to file extension check
+            
+            // First, check file extension (more reliable)
+            if (fileName != null) {
                 String fileExtension = fileName.toLowerCase();
                 isValidFile = fileExtension.endsWith(".mp3") || fileExtension.endsWith(".wav") ||
                              fileExtension.endsWith(".mp4") || fileExtension.endsWith(".avi") ||
@@ -122,10 +123,21 @@ public class SpeechToTextController {
                              fileExtension.endsWith(".m4a") || fileExtension.endsWith(".aac");
             }
             
+            // If extension check fails, fallback to MIME type
+            if (!isValidFile && contentType != null) {
+                isValidFile = ALLOWED_MEDIA_TYPES.contains(contentType.toLowerCase());
+            }
+            
             if (!isValidFile) {
+                // Log the actual MIME type for debugging
+                System.err.println("Rejected file - MIME type: " + contentType + ", File name: " + fileName);
+                
                 Map<String, String> error = new HashMap<>();
                 error.put("errorCode", "400");
-                error.put("errorMessage", "Invalid file format. Supported formats: MP3, WAV, MP4, AVI, MOV, MKV, WebM, M4A, AAC");
+                error.put("errorMessage", String.format(
+                    "Invalid file format. Received MIME type: %s, File: %s. Supported formats: MP3, WAV, MP4, AVI, MOV, MKV, WebM, M4A, AAC", 
+                    contentType, fileName
+                ));
                 ApiResponse<SpeechToTextResponse> response = new ApiResponse<>();
                 response.error(error);
                 return ResponseEntity.badRequest().body(response);
