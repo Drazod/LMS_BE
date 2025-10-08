@@ -7,9 +7,7 @@ nltk==3.8.1
 sentence-transformers==2.2.2
 numpy==1.24.3
 openai==1.35.0  # Updated for latest API
-pyaudio==0.2.11  # Required for microphone input (optional)
 
 # Additional system dependencies:
 # - ffmpeg (for audio format conversion)
-# - For Windows: pip install pipwin && pipwin install pyaudio
 # - Set OPENAI_API_KEY environment variable for AI-powered question generation
