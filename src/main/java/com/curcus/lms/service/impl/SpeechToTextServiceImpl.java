@@ -97,33 +97,61 @@ public class SpeechToTextServiceImpl implements SpeechToTextService {
 
         // Execute the command
         ProcessBuilder processBuilder = new ProcessBuilder(command);
-        processBuilder.redirectErrorStream(true);
+        // Don't redirect error stream - we want to capture them separately
         
         Process process = processBuilder.start();
         
-        // Read output
+        // Read output streams concurrently to avoid blocking
         StringBuilder output = new StringBuilder();
         StringBuilder errorOutput = new StringBuilder();
         
-        try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
-             BufferedReader errorReader = new BufferedReader(new InputStreamReader(process.getErrorStream()))) {
-            
-            String line;
-            while ((line = reader.readLine()) != null) {
-                output.append(line).append("\n");
+        // Create threads to read both streams concurrently
+        Thread outputThread = new Thread(() -> {
+            try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    synchronized (output) {
+                        output.append(line).append("\n");
+                    }
+                }
+            } catch (Exception e) {
+                logger.debug("Error reading output stream: {}", e.getMessage());
             }
-            
-            while ((line = errorReader.readLine()) != null) {
-                errorOutput.append(line).append("\n");
+        });
+        
+        Thread errorThread = new Thread(() -> {
+            try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getErrorStream()))) {
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    synchronized (errorOutput) {
+                        errorOutput.append(line).append("\n");
+                    }
+                }
+            } catch (Exception e) {
+                logger.debug("Error reading error stream: {}", e.getMessage());
             }
-        }
+        });
+        
+        outputThread.start();
+        errorThread.start();
 
         // Wait for process completion with timeout
         boolean finished = process.waitFor(pythonTimeoutSeconds, TimeUnit.SECONDS);
         
         if (!finished) {
             process.destroyForcibly();
+            outputThread.interrupt();
+            errorThread.interrupt();
             throw new RuntimeException("Python script execution timed out after " + pythonTimeoutSeconds + " seconds");
+        }
+
+        // Wait for output threads to complete
+        try {
+            outputThread.join(5000); // Wait up to 5 seconds for output thread
+            errorThread.join(5000);  // Wait up to 5 seconds for error thread
+        } catch (InterruptedException e) {
+            logger.warn("Interrupted while waiting for output threads to complete");
+            Thread.currentThread().interrupt();
         }
 
         int exitCode = process.exitValue();
@@ -153,7 +181,15 @@ public class SpeechToTextServiceImpl implements SpeechToTextService {
         }
 
         String result = output.toString().trim();
-        logger.debug("Python script execution completed successfully");
+        String errors = errorOutput.toString().trim();
+        
+        logger.info("Python script execution completed successfully with exit code: {}", exitCode);
+        logger.debug("Python script output length: {} characters", result.length());
+        
+        if (!errors.isEmpty()) {
+            logger.warn("Python script had warning/info messages: {}", errors);
+        }
+        
         return result;
     }
 
