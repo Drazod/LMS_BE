@@ -51,7 +51,7 @@ public class SpeechToTextController {
 
     private static final long MAX_FILE_SIZE = 100 * 1024 * 1024; // 100MB (increased for video files)
 
-    @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PostMapping(value = "/upload", consumes = {MediaType.MULTIPART_FORM_DATA_VALUE, MediaType.ALL_VALUE})
     @Operation(
             summary = "Upload audio/video file and convert to text",
             description = "Upload an audio file (MP3, WAV, M4A) or video file (MP4, AVI, MOV), extract audio, convert to text, create embeddings, and optionally generate IELTS-style questions"
@@ -163,7 +163,7 @@ public class SpeechToTextController {
         }
     }
 
-    @PostMapping(value = "/test-upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PostMapping(value = "/test-upload", consumes = {MediaType.MULTIPART_FORM_DATA_VALUE, MediaType.ALL_VALUE})
     @Operation(
             summary = "Test file upload validation",
             description = "Test endpoint to validate file upload without processing - for debugging"

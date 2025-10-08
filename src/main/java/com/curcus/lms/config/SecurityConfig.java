@@ -47,7 +47,13 @@ public class SecurityConfig {
             "/api/password-reset/**",
             "/api/payment/vn-pay-callback",
             "/api/ratings/course/**",
-            "/api/ratings/course-rating/**"
+            "/api/ratings/course-rating/**",
+            
+            // Speech-to-text endpoints (for testing)
+            "/api/speech-to-text/test-upload",
+            "/api/speech-to-text/upload",
+            "/api/speech-to-text/supported-formats",
+            "/api/speech-to-text/limits"
     };
     private final JwtAuthenticationFilter jwtAuthFilter;
     private final AuthenticationProvider authenticationProvider;
