@@ -41,12 +41,15 @@ RUN python3 -c "import nltk; nltk.download('punkt', quiet=True)" || echo "NLTK d
 # Stage 3: Runtime (lightweight)
 FROM eclipse-temurin:17-jre-jammy
 
-# Install only essential runtime dependencies
+# Install runtime dependencies with audio tools
 RUN apt-get update && apt-get install -y --no-install-recommends \
     python3 \
     python3-distutils \
     ffmpeg \
+    libsndfile1 \
+    sox \
     curl \
+    file \
     && rm -rf /var/lib/apt/lists/* \
     && ln -s /usr/bin/python3 /usr/bin/python
 

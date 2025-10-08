@@ -39,14 +39,126 @@ class SpeechToTextProcessor:
             }))
             sys.exit(1)
     
+    def validate_audio_file(self, input_path):
+        """Validate audio file before processing"""
+        try:
+            # Check file exists and size
+            if not os.path.exists(input_path):
+                return False, "File does not exist"
+                
+            file_size = os.path.getsize(input_path)
+            if file_size == 0:
+                return False, "File is empty"
+                
+            if file_size < 1024:  # Less than 1KB is suspicious
+                return False, "File too small to contain valid audio"
+                
+            # Try to detect file type
+            try:
+                import subprocess
+                result = subprocess.run(['file', '-b', '--mime-type', input_path], 
+                                      capture_output=True, text=True, timeout=10)
+                mime_type = result.stdout.strip()
+                
+                if not any(x in mime_type for x in ['audio/', 'video/', 'application/octet-stream']):
+                    return False, f"Invalid file type: {mime_type}"
+            except:
+                pass  # file command not available or failed
+                
+            return True, "Valid"
+            
+        except Exception as e:
+            return False, f"Validation error: {str(e)}"
+    
+    def _repair_and_load_mp3(self, input_path):
+        """Attempt to repair corrupted MP3 using FFmpeg and reload"""
+        import subprocess
+        
+        try:
+            # Create temporary repaired file
+            with tempfile.NamedTemporaryFile(suffix="_repaired.mp3", delete=False) as temp_file:
+                repaired_path = temp_file.name
+            
+            # Use FFmpeg to repair the MP3 file
+            ffmpeg_cmd = [
+                'ffmpeg', '-y',  # Overwrite output file
+                '-err_detect', 'ignore_err',  # Ignore errors
+                '-ignore_unknown',  # Ignore unknown streams
+                '-fflags', '+genpts',  # Generate presentation timestamps
+                '-i', input_path,  # Input file
+                '-c:a', 'mp3',  # Audio codec
+                '-ar', '44100',  # Sample rate
+                '-ac', '2',  # Channels
+                '-b:a', '128k',  # Bitrate
+                repaired_path  # Output file
+            ]
+            
+            result = subprocess.run(ffmpeg_cmd, capture_output=True, text=True, timeout=120)
+            
+            if result.returncode != 0:
+                raise Exception(f"FFmpeg repair failed: {result.stderr}")
+            
+            # Try to load the repaired file
+            audio = AudioSegment.from_mp3(repaired_path)
+            
+            # Cleanup the temporary repaired file
+            try:
+                os.unlink(repaired_path)
+            except:
+                pass
+                
+            return audio
+            
+        except Exception as e:
+            # Cleanup any temporary files
+            try:
+                if 'repaired_path' in locals():
+                    os.unlink(repaired_path)
+            except:
+                pass
+            raise Exception(f"MP3 repair process failed: {str(e)}")
+    
     def convert_to_wav(self, input_path):
         """Convert MP3, MP4, or other audio/video formats to WAV format for speech recognition"""
         try:
             file_extension = Path(input_path).suffix.lower()
             
-            # Load audio/video file based on format
+            # Validate file exists and is not empty
+            if not os.path.exists(input_path):
+                raise Exception(f"File does not exist: {input_path}")
+            
+            file_size = os.path.getsize(input_path)
+            if file_size == 0:
+                raise Exception(f"File is empty: {input_path}")
+            
+            # Try multiple approaches for loading audio files
+            audio = None
+            errors = []
+            
+            # Load audio/video file with fallback strategies
             if file_extension == '.mp3':
-                audio = AudioSegment.from_mp3(input_path)
+                try:
+                    # First try: direct MP3 loading
+                    audio = AudioSegment.from_mp3(input_path)
+                except Exception as e1:
+                    errors.append(f"MP3 direct load failed: {str(e1)}")
+                    try:
+                        # Second try: generic file loader
+                        audio = AudioSegment.from_file(input_path, format="mp3")
+                    except Exception as e2:
+                        errors.append(f"MP3 generic load failed: {str(e2)}")
+                        try:
+                            # Third try: force mp3 format with parameters
+                            audio = AudioSegment.from_file(input_path, format="mp3", 
+                                                         parameters=["-ignore_unknown", "-err_detect", "ignore_err"])
+                        except Exception as e3:
+                            errors.append(f"MP3 forced load failed: {str(e3)}")
+                            try:
+                                # Fourth try: use FFmpeg directly to repair and convert
+                                audio = self._repair_and_load_mp3(input_path)
+                            except Exception as e4:
+                                errors.append(f"MP3 repair failed: {str(e4)}")
+                            
             elif file_extension == '.mp4':
                 # Extract audio from MP4 video
                 audio = AudioSegment.from_file(input_path, format="mp4")
@@ -68,23 +180,46 @@ class SpeechToTextProcessor:
                 audio = AudioSegment.from_file(input_path, format="aac")
             else:
                 # Try to load as generic audio/video file
-                audio = AudioSegment.from_file(input_path)
+                try:
+                    audio = AudioSegment.from_file(input_path)
+                except Exception as e:
+                    errors.append(f"Generic load failed: {str(e)}")
+                    
+            if audio is None:
+                error_msg = f"Failed to load audio file {input_path}. Errors: {'; '.join(errors)}"
+                raise Exception(error_msg)
             
+            # Validate audio was loaded successfully
+            if len(audio) == 0:
+                raise Exception("Loaded audio has zero duration")
+                
             # Optimize audio for speech recognition
             # Convert to mono if stereo (reduces processing time)
             if audio.channels > 1:
                 audio = audio.set_channels(1)
             
-            # Normalize audio levels
-            audio = audio.normalize()
+            # Normalize audio levels (with error handling)
+            try:
+                audio = audio.normalize()
+            except Exception as e:
+                print(f"Warning: Could not normalize audio: {str(e)}")
             
             # Set sample rate to 16kHz for better speech recognition
-            audio = audio.set_frame_rate(16000)
+            try:
+                audio = audio.set_frame_rate(16000)
+            except Exception as e:
+                print(f"Warning: Could not set frame rate: {str(e)}")
             
             # Convert to WAV and save to temporary file
             with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as temp_wav:
-                audio.export(temp_wav.name, format="wav")
-                return temp_wav.name, len(audio) / 1000.0  # Return duration in seconds
+                try:
+                    audio.export(temp_wav.name, format="wav", 
+                               parameters=["-ar", "16000", "-ac", "1", "-acodec", "pcm_s16le"])
+                    return temp_wav.name, len(audio) / 1000.0  # Return duration in seconds
+                except Exception as e:
+                    # Fallback export without parameters
+                    audio.export(temp_wav.name, format="wav")
+                    return temp_wav.name, len(audio) / 1000.0
                 
         except Exception as e:
             raise Exception(f"Error converting {file_extension} to WAV: {str(e)}")
@@ -92,6 +227,15 @@ class SpeechToTextProcessor:
     def transcribe_audio(self, input_path):
         """Transcribe audio/video file to text"""
         try:
+            # First validate the input file
+            is_valid, validation_msg = self.validate_audio_file(input_path)
+            if not is_valid:
+                return {
+                    "success": False,
+                    "error": f"File validation failed: {validation_msg}",
+                    "message": "Please check your audio file and try again"
+                }
+            
             file_extension = Path(input_path).suffix.lower()
             duration_seconds = 0
             
