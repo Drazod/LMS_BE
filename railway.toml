@@ -1,0 +1,26 @@
+[build]
+builder = "dockerfile"
+
+[deploy]
+healthcheckPath = "/api/health"
+healthcheckTimeout = 300
+restartPolicyType = "on_failure"
+
+[env]
+# Railway will provide these automatically
+PORT = { default = "8080" }
+RAILWAY_ENVIRONMENT = { default = "production" }
+
+# You need to set these in Railway dashboard
+SPRING_DATASOURCE_URL = { required = true }
+SPRING_DATASOURCE_USERNAME = { required = true }
+SPRING_DATASOURCE_PASSWORD = { required = true }
+MAIL_USERNAME = { required = false }
+MAIL_PASSWORD = { required = false }
+
+# Speech-to-Text specific environment variables
+PYTHON_EXECUTABLE = { default = "python3" }
+TEMP_DIR = { default = "/tmp" }
+
+# Optional: Set this for enhanced AI features
+OPENAI_API_KEY = { required = false }
