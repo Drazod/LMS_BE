@@ -4,7 +4,7 @@
 speechrecognition==3.10.0
 pydub==0.25.1
 nltk==3.8.1
-sentence-transformers==2.2.2
+sentence-transformers==3.0.1  # Latest stable version with proper huggingface_hub compatibility
 numpy==1.24.3
 openai==1.35.0  # Updated for latest API
 
