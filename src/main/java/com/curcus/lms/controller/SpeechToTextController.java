@@ -13,6 +13,9 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import org.springframework.beans.factory.annotation.Autowired;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.Map;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -83,20 +86,22 @@ public class SpeechToTextController {
         try {
             // Validate file
             if (file.isEmpty()) {
-                return ResponseEntity.badRequest()
-                        .body(ApiResponse.<SpeechToTextResponse>builder()
-                                .success(false)
-                                .message("No file provided")
-                                .build());
+                Map<String, String> error = new HashMap<>();
+                error.put("errorCode", "400");
+                error.put("errorMessage", "No file provided");
+                ApiResponse<SpeechToTextResponse> response = new ApiResponse<>();
+                response.error(error);
+                return ResponseEntity.badRequest().body(response);
             }
 
             // Check file size
             if (file.getSize() > MAX_FILE_SIZE) {
-                return ResponseEntity.badRequest()
-                        .body(ApiResponse.<SpeechToTextResponse>builder()
-                                .success(false)
-                                .message("File size exceeds maximum allowed size of 100MB")
-                                .build());
+                Map<String, String> error = new HashMap<>();
+                error.put("errorCode", "400");
+                error.put("errorMessage", "File size exceeds maximum allowed size of 100MB");
+                ApiResponse<SpeechToTextResponse> response = new ApiResponse<>();
+                response.error(error);
+                return ResponseEntity.badRequest().body(response);
             }
 
             // Check file type
@@ -118,11 +123,12 @@ public class SpeechToTextController {
             }
             
             if (!isValidFile) {
-                return ResponseEntity.badRequest()
-                        .body(ApiResponse.<SpeechToTextResponse>builder()
-                                .success(false)
-                                .message("Invalid file format. Supported formats: MP3, WAV, MP4, AVI, MOV, MKV, WebM, M4A, AAC")
-                                .build());
+                Map<String, String> error = new HashMap<>();
+                error.put("errorCode", "400");
+                error.put("errorMessage", "Invalid file format. Supported formats: MP3, WAV, MP4, AVI, MOV, MKV, WebM, M4A, AAC");
+                ApiResponse<SpeechToTextResponse> response = new ApiResponse<>();
+                response.error(error);
+                return ResponseEntity.badRequest().body(response);
             }
 
             // Process the audio file
@@ -131,20 +137,17 @@ public class SpeechToTextController {
             );
 
             String fileType = fileName != null && fileName.toLowerCase().matches(".*\\.(mp4|avi|mov|mkv|webm|flv)$") ? "video" : "audio";
-            return ResponseEntity.ok(
-                    ApiResponse.<SpeechToTextResponse>builder()
-                            .success(true)
-                            .message(fileType.equals("video") ? "Video processed successfully - audio extracted and transcribed" : "Audio processed successfully")
-                            .data(result)
-                            .build()
-            );
+            ApiResponse<SpeechToTextResponse> response = new ApiResponse<>();
+            response.ok(result);
+            return ResponseEntity.ok(response);
 
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(ApiResponse.<SpeechToTextResponse>builder()
-                            .success(false)
-                            .message("Error processing audio file: " + e.getMessage())
-                            .build());
+            Map<String, String> error = new HashMap<>();
+            error.put("errorCode", "500");
+            error.put("errorMessage", "Error processing audio file: " + e.getMessage());
+            ApiResponse<SpeechToTextResponse> response = new ApiResponse<>();
+            response.error(error);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
         }
     }
 
@@ -155,18 +158,15 @@ public class SpeechToTextController {
     )
     @PreAuthorize("hasAnyRole('STUDENT', 'INSTRUCTOR', 'ADMIN')")
     public ResponseEntity<ApiResponse<Object>> getSupportedFormats() {
-        return ResponseEntity.ok(
-                ApiResponse.builder()
-                        .success(true)
-                        .message("Supported audio and video formats")
-                        .data(java.util.Map.of(
-                                "allFormats", ALLOWED_MEDIA_TYPES,
-                                "audioFormats", Arrays.asList("audio/mpeg", "audio/mp3", "audio/wav", "audio/m4a", "audio/aac"),
-                                "videoFormats", Arrays.asList("video/mp4", "video/avi", "video/quicktime", "video/webm", "video/x-matroska"),
-                                "fileExtensions", Arrays.asList(".mp3", ".wav", ".mp4", ".avi", ".mov", ".mkv", ".webm", ".m4a", ".aac")
-                        ))
-                        .build()
+        Object data = java.util.Map.of(
+                "allFormats", ALLOWED_MEDIA_TYPES,
+                "audioFormats", Arrays.asList("audio/mpeg", "audio/mp3", "audio/wav", "audio/m4a", "audio/aac"),
+                "videoFormats", Arrays.asList("video/mp4", "video/avi", "video/quicktime", "video/webm", "video/x-matroska"),
+                "fileExtensions", Arrays.asList(".mp3", ".wav", ".mp4", ".avi", ".mov", ".mkv", ".webm", ".m4a", ".aac")
         );
+        ApiResponse<Object> response = new ApiResponse<>();
+        response.ok(data);
+        return ResponseEntity.ok(response);
     }
 
     @GetMapping("/limits")
@@ -176,20 +176,17 @@ public class SpeechToTextController {
     )
     @PreAuthorize("hasAnyRole('STUDENT', 'INSTRUCTOR', 'ADMIN')")
     public ResponseEntity<ApiResponse<Object>> getUploadLimits() {
-        return ResponseEntity.ok(
-                ApiResponse.builder()
-                        .success(true)
-                        .message("Upload limits and constraints")
-                        .data(java.util.Map.of(
-                                "maxFileSizeBytes", MAX_FILE_SIZE,
-                                "maxFileSizeMB", MAX_FILE_SIZE / (1024 * 1024),
-                                "supportedFormats", ALLOWED_MEDIA_TYPES,
-                                "maxAudioDurationMinutes", 10,
-                                "maxQuestions", 10,
-                                "minQuestions", 1,
-                                "supportsVideoFiles", true
-                        ))
-                        .build()
+        Object data = java.util.Map.of(
+                "maxFileSizeBytes", MAX_FILE_SIZE,
+                "maxFileSizeMB", MAX_FILE_SIZE / (1024 * 1024),
+                "supportedFormats", ALLOWED_MEDIA_TYPES,
+                "maxAudioDurationMinutes", 10,
+                "maxQuestions", 10,
+                "minQuestions", 1,
+                "supportsVideoFiles", true
         );
+        ApiResponse<Object> response = new ApiResponse<>();
+        response.ok(data);
+        return ResponseEntity.ok(response);
     }
 }
