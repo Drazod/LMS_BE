@@ -49,7 +49,7 @@ RUN pip3 install -r scripts/requirements.txt
 RUN python3 -c "import nltk; nltk.download('punkt', quiet=True)" || echo "NLTK download completed"
 
 # Make Python scripts executable
-RUN chmod +x scripts/*.py scripts/*.sh scripts/*.bat
+RUN chmod +x scripts/*.py || echo "Making Python files executable"
 
 # Verify Python environment
 RUN python3 -c "import speech_recognition, pydub, nltk, sentence_transformers; print('✅ Python dependencies verified')" || echo "⚠️ Some Python dependencies missing but will continue"
