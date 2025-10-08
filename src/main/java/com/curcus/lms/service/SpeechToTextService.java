@@ -26,4 +26,12 @@ public interface SpeechToTextService {
      * @throws Exception if execution fails
      */
     String executePythonScript(String filePath, boolean generateQuestions, int numQuestions) throws Exception;
+    
+    /**
+     * Test Python environment and script availability
+     * 
+     * @return Test result information
+     * @throws Exception if test fails
+     */
+    String testPythonEnvironment() throws Exception;
 }

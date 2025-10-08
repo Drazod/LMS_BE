@@ -254,4 +254,33 @@ public class SpeechToTextController {
         response.ok(data);
         return ResponseEntity.ok(response);
     }
+
+    @GetMapping("/test-python")
+    @Operation(
+            summary = "Test Python environment",
+            description = "Test if Python script and dependencies are properly configured"
+    )
+    public ResponseEntity<ApiResponse<Object>> testPythonEnvironment() {
+        try {
+            // Test Python script execution with help flag
+            String testResult = speechToTextService.testPythonEnvironment();
+            
+            Map<String, Object> result = new HashMap<>();
+            result.put("status", "success");
+            result.put("message", "Python environment is working correctly");
+            result.put("details", testResult);
+            
+            ApiResponse<Object> response = new ApiResponse<>();
+            response.ok(result);
+            return ResponseEntity.ok(response);
+            
+        } catch (Exception e) {
+            Map<String, String> error = new HashMap<>();
+            error.put("errorCode", "500");
+            error.put("errorMessage", "Python environment test failed: " + e.getMessage());
+            ApiResponse<Object> response = new ApiResponse<>();
+            response.error(error);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
+        }
+    }
 }

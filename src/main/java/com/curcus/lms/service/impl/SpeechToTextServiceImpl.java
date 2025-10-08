@@ -76,6 +76,9 @@ public class SpeechToTextServiceImpl implements SpeechToTextService {
     @Override
     public String executePythonScript(String filePath, boolean generateQuestions, int numQuestions) throws Exception {
         logger.debug("Executing Python script with file: {}", filePath);
+        
+        // Validate Python environment before execution
+        validatePythonEnvironment();
 
         // Build command
         List<String> command = new ArrayList<>();
@@ -125,8 +128,28 @@ public class SpeechToTextServiceImpl implements SpeechToTextService {
 
         int exitCode = process.exitValue();
         if (exitCode != 0) {
-            logger.error("Python script failed with exit code: {}. Error output: {}", exitCode, errorOutput.toString());
-            throw new RuntimeException("Python script execution failed with exit code " + exitCode + ": " + errorOutput.toString());
+            String fullOutput = output.toString();
+            String fullError = errorOutput.toString();
+            
+            logger.error("Python script failed with exit code: {}", exitCode);
+            logger.error("Command executed: {}", String.join(" ", command));
+            logger.error("Python executable path: {}", pythonExecutable);
+            logger.error("Python script path: {}", resolvePythonScriptPath());
+            logger.error("Standard output: {}", fullOutput);
+            logger.error("Error output: {}", fullError);
+            
+            // Create a detailed error message
+            StringBuilder errorMessage = new StringBuilder();
+            errorMessage.append("Python script execution failed with exit code ").append(exitCode);
+            
+            if (!fullError.isEmpty()) {
+                errorMessage.append("\nError: ").append(fullError);
+            }
+            if (!fullOutput.isEmpty()) {
+                errorMessage.append("\nOutput: ").append(fullOutput);
+            }
+            
+            throw new RuntimeException(errorMessage.toString());
         }
 
         String result = output.toString().trim();
@@ -153,6 +176,40 @@ public class SpeechToTextServiceImpl implements SpeechToTextService {
         // Return the original path and let the system handle it
         logger.warn("Python script not found at expected locations. Using: {}", pythonScriptPath);
         return pythonScriptPath;
+    }
+    
+    private void validatePythonEnvironment() throws Exception {
+        // Check if Python script exists
+        String scriptPath = resolvePythonScriptPath();
+        if (!Files.exists(Paths.get(scriptPath))) {
+            throw new RuntimeException("Python script not found at: " + scriptPath);
+        }
+        
+        logger.debug("Python environment validation:");
+        logger.debug("- Python executable: {}", pythonExecutable);
+        logger.debug("- Script path: {}", scriptPath);
+        logger.debug("- Working directory: {}", System.getProperty("user.dir"));
+        logger.debug("- Temp directory: {}", tempDir);
+        
+        // Test Python executable
+        try {
+            ProcessBuilder testBuilder = new ProcessBuilder(pythonExecutable, "--version");
+            Process testProcess = testBuilder.start();
+            boolean finished = testProcess.waitFor(10, TimeUnit.SECONDS);
+            
+            if (!finished) {
+                testProcess.destroyForcibly();
+                throw new RuntimeException("Python version check timed out - Python executable may not be available: " + pythonExecutable);
+            }
+            
+            if (testProcess.exitValue() != 0) {
+                throw new RuntimeException("Python executable test failed: " + pythonExecutable);
+            }
+            
+            logger.debug("Python executable test passed");
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to validate Python executable: " + pythonExecutable + ". Error: " + e.getMessage());
+        }
     }
 
     private SpeechToTextResponse parsePythonOutput(String pythonOutput) throws Exception {
@@ -257,5 +314,74 @@ public class SpeechToTextServiceImpl implements SpeechToTextService {
             logger.error("Failed to parse Python script output: {}", pythonOutput, e);
             throw new RuntimeException("Failed to parse Python script output: " + e.getMessage(), e);
         }
+    }
+    
+    @Override
+    public String testPythonEnvironment() throws Exception {
+        logger.info("Testing Python environment...");
+        
+        // Test 1: Python executable
+        ProcessBuilder pythonTest = new ProcessBuilder(pythonExecutable, "--version");
+        Process pythonProcess = pythonTest.start();
+        
+        StringBuilder pythonOutput = new StringBuilder();
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(pythonProcess.getInputStream()))) {
+            String line;
+            while ((line = reader.readLine()) != null) {
+                pythonOutput.append(line).append("\n");
+            }
+        }
+        
+        boolean pythonFinished = pythonProcess.waitFor(10, TimeUnit.SECONDS);
+        if (!pythonFinished || pythonProcess.exitValue() != 0) {
+            throw new RuntimeException("Python executable test failed: " + pythonExecutable);
+        }
+        
+        // Test 2: Python script exists
+        String scriptPath = resolvePythonScriptPath();
+        if (!Files.exists(Paths.get(scriptPath))) {
+            throw new RuntimeException("Python script not found at: " + scriptPath);
+        }
+        
+        // Test 3: Python script help
+        ProcessBuilder scriptTest = new ProcessBuilder(pythonExecutable, scriptPath, "--help");
+        Process scriptProcess = scriptTest.start();
+        
+        StringBuilder scriptOutput = new StringBuilder();
+        StringBuilder scriptError = new StringBuilder();
+        
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(scriptProcess.getInputStream()));
+             BufferedReader errorReader = new BufferedReader(new InputStreamReader(scriptProcess.getErrorStream()))) {
+            
+            String line;
+            while ((line = reader.readLine()) != null) {
+                scriptOutput.append(line).append("\n");
+            }
+            
+            while ((line = errorReader.readLine()) != null) {
+                scriptError.append(line).append("\n");
+            }
+        }
+        
+        boolean scriptFinished = scriptProcess.waitFor(30, TimeUnit.SECONDS);
+        if (!scriptFinished) {
+            scriptProcess.destroyForcibly();
+            throw new RuntimeException("Python script test timed out");
+        }
+        
+        // Script help should return exit code 0
+        if (scriptProcess.exitValue() != 0) {
+            throw new RuntimeException("Python script test failed. Exit code: " + scriptProcess.exitValue() + 
+                                     "\nOutput: " + scriptOutput.toString() + 
+                                     "\nError: " + scriptError.toString());
+        }
+        
+        // Return test results
+        return String.format("Python Environment Test Results:\n" +
+                           "✅ Python executable: %s (%s)\n" +
+                           "✅ Script found: %s\n" +
+                           "✅ Script help output: %s",
+                           pythonExecutable, pythonOutput.toString().trim(),
+                           scriptPath, scriptOutput.toString().trim());
     }
 }
